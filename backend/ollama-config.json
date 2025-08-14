@@ -1,0 +1,32 @@
+{
+  "chatModel": "chatbot-optimized",
+  "embedModel": "nomic-embed-text",
+  "parameters": {
+    "temperature": 0.4,
+    "top_p": 0.9,
+    "top_k": 40,
+    "repeat_penalty": 1.1,
+    "num_ctx": 2048,
+    "num_predict": 256,
+    "num_thread": 2,
+    "num_gpu": 0,
+    "gpu_layers": 0,
+    "stop": ["</s>", "Human:", "Assistant:"],
+    "seed": 42
+  },
+  "system_prompts": {
+    "chat": "Eres un asistente virtual especializado en atención al cliente para un centro de terapia y consultas psicológicas. Responde de manera clara, concisa y útil. Mantén las respuestas por debajo de 200 palabras. Usa emojis apropiados para hacer la conversación más amigable.",
+    "classification": "Eres un clasificador de intenciones. Responde SOLO con JSON válido, sin markdown ni texto adicional. Formato: {\"type\": \"tipo\", \"slots\": {\"slot\": \"valor\"}}",
+    "rag": "Eres un asistente experto. Usa SOLO la información del contexto proporcionado. Si no tienes la información, di que no la tienes. Responde de manera clara y útil."
+  },
+  "performance": {
+    "num_threads": 2,
+    "num_gpu": 0,
+    "gpu_layers": 0,
+    "main_gpu": 0,
+    "tensor_split": [],
+    "embedding": true,
+    "rope_frequency_base": 10000.0,
+    "rope_frequency_scale": 0.5
+  }
+}

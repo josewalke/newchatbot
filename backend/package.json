@@ -1,0 +1,54 @@
+{
+  "name": "chatbot-backend",
+  "version": "1.0.0",
+  "description": "Backend del chatbot self-hosted con Ollama",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "dev:fast": "tsx watch src/server.ts",
+    "dev:ultra": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "test": "jest",
+    "db:migrate": "tsx src/db/migrations.ts"
+  },
+  "keywords": [
+    "chatbot",
+    "ollama",
+    "rag",
+    "appointments"
+  ],
+  "author": "Tu Nombre",
+  "license": "MIT",
+  "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "axios": "^1.6.2",
+    "better-sqlite3": "^9.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^11.1.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "nodemon": "^3.0.2",
+    "prettier": "^3.1.0",
+    "ts-node": "^10.9.1",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}

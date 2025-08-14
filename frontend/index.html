@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ChatBot Self-Hosted con Ollama - Asistente virtual inteligente" />
+    <meta name="keywords" content="chatbot, ollama, IA, asistente virtual, citas, RAG" />
+    <meta name="author" content="Tu Nombre" />
+    
+    <!-- Preconnect para fuentes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Fuente Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <title>ChatBot Self-Hosted</title>
+    
+    <style>
+      /* Estilos de carga inicial */
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-family: 'Inter', sans-serif;
+      }
+      
+      .loading-content {
+        text-align: center;
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+        margin: 0 auto 20px;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .loading-title {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      
+      .loading-subtitle {
+        font-size: 16px;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Pantalla de carga inicial -->
+      <div class="loading">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <div class="loading-title">ChatBot Self-Hosted</div>
+          <div class="loading-subtitle">Cargando asistente virtual...</div>
+        </div>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
