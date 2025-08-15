@@ -8,7 +8,7 @@ interface Message {
   timestamp: Date;
   intent?: {
     type: string;
-    slots: Record<string, any>;
+    slots?: Record<string, any>;
   };
 }
 
@@ -103,7 +103,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           </p>
           
           {/* Mostrar información de intención si está disponible */}
-          {message.intent && (
+          {message.intent && message.intent.type && (
             <div className="mt-2 pt-2 border-t border-gray-100">
               <div className="flex items-center space-x-2 text-xs text-gray-600">
                 <Info className="w-3 h-3" />
@@ -114,9 +114,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               </div>
               
               {/* Mostrar slots si hay información relevante */}
-              {Object.keys(message.intent.slots).length > 0 && (
+              {Object.keys(message.intent.slots || {}).length > 0 && (
                 <div className="mt-1 text-xs text-gray-500">
-                  {Object.entries(message.intent.slots).map(([key, value]) => (
+                  {Object.entries(message.intent.slots || {}).map(([key, value]) => (
                     value && (
                       <div key={key} className="flex space-x-1">
                         <span className="font-medium">{key}:</span>

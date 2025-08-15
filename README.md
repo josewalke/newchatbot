@@ -1,253 +1,316 @@
-# ChatBot Self-Hosted con Ollama - VERSIÓN MEJORADA
+# 🏥 NewChatbot - Sistema Integral de Farmacia
 
-Un chatbot inteligente y completo que se ejecuta localmente usando Ollama, con capacidades de RAG, gestión de citas, atención al cliente y ventas. **Ahora con modelo mejorado y pipeline de procesamiento avanzado.**
+## 📋 Descripción del Proyecto
 
-## 🚀 Características
+NewChatbot es un sistema integral de gestión para farmacias que incluye:
+- **Sistema de Citas**: Agendar, cancelar, mover, confirmar citas
+- **Atención al Cliente**: Tickets de soporte con IA integrada
+- **Sistema de Ventas**: Carrito de compras y gestión de productos
+- **Base de Datos Simulada**: Datos realistas de productos y servicios
 
-- **Chat inteligente** con clasificación de intenciones automática y mejorada
-- **RAG (Retrieval Augmented Generation)** optimizado con filtros de calidad
-- **Gestión de citas** completa (agendar, mover, cancelar, confirmar) con confirmación obligatoria
-- **Atención al cliente** con base de conocimiento personalizable
-- **Ventas** con propuestas de servicios y opciones de pago
-- **Integración WordPress** mediante iframe embebible
-- **Bot de Telegram** listo para usar
-- **Base de datos SQLite** sin dependencias externas
-- **Procesamiento de texto mejorado** con normalización y detección de idioma
-- **Sistema de evaluación** para medir la calidad del chatbot
+## 🚀 Funcionalidades Implementadas
 
-## 🆕 **MEJORAS IMPLEMENTADAS (v2.0)**
+### 1. Sistema de Gestión de Citas ✅
+- **Endpoints**:
+  - `GET /api/appointments/stats` - Estadísticas de citas
+  - `GET /api/appointments/available-slots` - Horarios disponibles
+  - `POST /api/appointments` - Crear cita
+  - `PUT /api/appointments/:id` - Actualizar cita
+  - `DELETE /api/appointments/:id` - Cancelar cita
+  - `POST /api/appointments/:id/confirm` - Confirmar cita
+  - `POST /api/appointments/:id/reschedule` - Reprogramar cita
 
-### **🧠 Modelo de IA Mejorado**
-- **Modelo principal**: `qwen2.5:14b-instruct` (antes `llama3.2:3b`)
-- **Contexto aumentado**: De 2048 a 8192 tokens
-- **Parámetros optimizados**: Temperature 0.4, Top-p 0.9 para mejor creatividad y coherencia
+### 2. Sistema de Ventas Uno a Uno ✅
+- **Endpoints**:
+  - `GET /api/sales/products` - Lista de productos
+  - `GET /api/sales/products/:id` - Detalle de producto
+  - `POST /api/sales/cart` - Crear carrito
+  - `PUT /api/sales/cart/:id` - Actualizar carrito
+  - `POST /api/sales/checkout` - Procesar compra
+  - `GET /api/sales/orders` - Historial de órdenes
 
-### **📝 Procesamiento de Texto Inteligente**
-- **Normalización automática**: Limpia abreviaciones, muletillas y errores comunes
-- **Detección de idioma**: Español, inglés y otros
-- **Clasificación rápida**: Patrones de palabras clave para respuestas instantáneas
-- **Manejo de ambigüedad**: Pregunta solo UN dato faltante a la vez
+### 3. Sistema de Atención al Cliente ✅
+- **Endpoints**:
+  - `GET /api/support/stats` - Estadísticas de soporte
+  - `POST /api/support/tickets` - Crear ticket
+  - `GET /api/support/tickets` - Lista de tickets
+  - `PUT /api/support/tickets/:id` - Actualizar ticket
 
-### **🔍 RAG Optimizado**
-- **Filtros de calidad**: Umbral de similitud aumentado a 0.78 (antes 0.3)
-- **Top-K reducido**: De 5 a 4 chunks para mayor precisión
-- **Contexto estructurado**: Mejor presentación de información recuperada
-- **Verificación de relevancia**: Evita respuestas basadas en contexto insuficiente
+### 4. Base de Datos Simulada ✅
+- **Productos**: 8 productos farmacéuticos con categorías y precios
+- **Servicios**: 5 servicios de farmacia con duración y precios
+- **Horarios**: Horarios completos de la semana
+- **Estructura**: Esquema optimizado con índices y relaciones
 
-### **💬 Conversaciones Más Inteligentes**
-- **System prompt mejorado**: Con few-shots y reglas claras
-- **Confirmación obligatoria**: Para operaciones críticas (crear/cancelar citas)
-- **Memoria contextual**: Mantiene estado entre mensajes
-- **Respuestas estructuradas**: Listas, preguntas y confirmaciones claras
+## 🏗️ Arquitectura del Sistema
 
-### **🧪 Sistema de Evaluación**
-- **30+ casos de prueba**: Cubren todos los escenarios del chatbot
-- **Métricas de calidad**: Precisión de intención, calidad de respuesta
-- **Categorías**: Reservas, reprogramar, cancelar, FAQ, ventas
-- **Dificultad**: Fácil, medio, difícil (incluyendo casos coloquiales)
-
-## 🛠️ Tecnologías
-
-- **Backend**: Node.js + Express + TypeScript
-- **Base de datos**: SQLite con better-sqlite3
-- **Frontend**: React + Vite + TypeScript
-- **IA**: Ollama local con **qwen2.5:14b-instruct** + nomic-embed-text
-- **Estilo**: CSS Modules + diseño minimal
-- **Procesamiento**: Normalización de texto, detección de idioma, clasificación rápida
-
-## 📋 Requisitos
-
-- Node.js 18+ LTS
-- Ollama instalado y ejecutándose en `http://localhost:11434`
-- **Modelo principal**: `qwen2.5:14b-instruct` (recomendado) o `llama3.1:8b-instruct`
-- Modelo de embeddings `nomic-embed-text`
-
-## 🚀 Instalación y Uso
-
-### 1. **Setup Rápido (Recomendado)**
-
-```bash
-# Clonar y configurar
-git clone <tu-repo>
-cd NewChatBot
-
-# Ejecutar setup mejorado (Windows)
-backend/setup-ollama-enhanced.bat
-
-# O manualmente (Linux/Mac)
-cd backend
-./setup-ollama-enhanced.sh
+### Backend (Node.js + TypeScript + Express)
+```
+backend/
+├── src/
+│   ├── controllers/          # Controladores de API
+│   ├── services/            # Lógica de negocio
+│   ├── routes/              # Definición de rutas
+│   ├── db/                  # Base de datos y migraciones
+│   ├── middlewares/         # Middlewares de Express
+│   └── utils/               # Utilidades y helpers
+├── dist/                    # Código compilado
+└── package.json
 ```
 
-### 2. **Configurar Ollama Manualmente**
-
-```bash
-# Instalar Ollama (https://ollama.ai)
-ollama pull qwen2.5:14b-instruct
-ollama pull nomic-embed-text
-
-# Verificar modelos
-ollama list
+### Frontend (React + TypeScript + Vite)
+```
+frontend/
+├── src/
+│   ├── components/          # Componentes React
+│   ├── pages/               # Páginas de la aplicación
+│   └── lib/                 # Librerías y utilidades
+├── public/                  # Archivos estáticos
+└── package.json
 ```
 
-### 3. **Backend**
+## 🗄️ Base de Datos
 
+### Tablas Principales
+- `customers` - Clientes del sistema
+- `services` - Servicios disponibles
+- `appointments` - Citas programadas
+- `pharmaceutical_products` - Productos farmacéuticos
+- `support_tickets` - Tickets de soporte
+- `shopping_carts` - Carritos de compra
+- `orders` - Órdenes procesadas
+- `pharmacy_hours` - Horarios de atención
+- `pharmacy_services` - Servicios de farmacia
+
+### Estructura de Datos
+```sql
+-- Ejemplo de tabla de productos
+CREATE TABLE pharmaceutical_products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT NOT NULL,
+  requires_prescription BOOLEAN DEFAULT FALSE,
+  price_cents INTEGER NOT NULL,
+  stock_quantity INTEGER DEFAULT 0,
+  active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 🚀 Instalación y Configuración
+
+### Prerrequisitos
+- Node.js 18+ 
+- npm o yarn
+- Git
+
+### 1. Clonar el Repositorio
+```bash
+git clone <repository-url>
+cd newchatbot
+```
+
+### 2. Configurar Backend
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# Editar .env con tus configuraciones
-npm run dev
+npm run build
 ```
 
-El backend estará disponible en `http://localhost:3000`
-
-### 4. **Frontend**
-
+### 3. Configurar Frontend
 ```bash
+cd ../frontend
+npm install
+```
+
+### 4. Configurar Base de Datos
+```bash
+cd ../backend
+node migrate-schema.js
+```
+
+### 5. Iniciar Servicios
+```bash
+# Terminal 1 - Backend
+cd backend
+npm start
+
+# Terminal 2 - Frontend
 cd frontend
-npm install
 npm run dev
 ```
 
-El frontend estará disponible en `http://localhost:5173`
+## 🔧 Scripts de Configuración
 
-## 📚 Uso del Sistema
+### Scripts Disponibles
+- `setup-enhanced.bat` - Configuración completa del sistema (Windows)
+- `start-backend.bat` - Iniciar backend
+- `start-frontend.bat` - Iniciar frontend
+- `start-chatbot.bat` - Iniciar todo el sistema
 
-### **Subir Conocimiento (RAG Mejorado)**
-
-1. Ve a la página "Playground" en el frontend
-2. Usa el tab "Conocimiento" para subir archivos PDF/MD/TXT
-3. El sistema creará embeddings automáticamente con mejor calidad
-4. Prueba el RAG en el chat - ahora con respuestas más precisas
-
-### **Crear Servicios y Reservar**
-
-1. En "Playground" → tab "Citas"
-2. Crea servicios con duración y precio
-3. Usa el formulario para probar reservas
-4. **Nuevo**: El chatbot ahora confirma antes de ejecutar operaciones
-
-### **Evaluar la Calidad**
-
+### Migración de Base de Datos
 ```bash
-cd backend
-npm run test:eval  # Ejecuta las pruebas de evaluación
+# Ejecutar migración completa
+node migrate-schema.js
+
+# Verificar tablas creadas
+node check-tables.js
 ```
 
-## 🔧 Configuración
+## 🐛 Problemas Encontrados y Soluciones
 
-### **Variables de Entorno (.env)**
+### 1. Error de Importación de Módulos ❌
+**Problema**: `node:internal/modules/cjs/loader:1228`
+**Causa**: Sintaxis incorrecta de importación en scripts de migración
+**Solución**: Usar `require('./dist/db/db')` en lugar de `require('./db').default`
 
-```env
-PORT=3000
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:14b-instruct
-EMBED_MODEL=nomic-embed-text
-TELEGRAM_BOT_TOKEN=tu_token_aqui
-```
+### 2. Tablas No Existentes ❌
+**Problema**: `SqliteError: no such table: pharmaceutical_products`
+**Causa**: Las tablas no se crearon durante la migración
+**Solución**: Ejecutar `migrate-schema.js` que crea todas las tablas en el orden correcto
 
-### **Configuración de Ollama**
+### 3. Conflictos de Rutas ❌
+**Problema**: Rutas específicas interceptadas por parámetros dinámicos
+**Causa**: Orden incorrecto de rutas en `appointments.routes.ts`
+**Solución**: Colocar rutas específicas (`/stats`, `/available-slots`) antes de rutas con parámetros (`/:id`)
 
-El archivo `ollama-config.json` ahora incluye:
-- Modelo mejorado con parámetros optimizados
-- Contexto aumentado para mejor comprensión
-- System prompts con few-shots
+### 4. Errores de Columna ❌
+**Problema**: `SqliteError: no such column: scheduled`
+**Causa**: Esquema de base de datos desactualizado
+**Solución**: Usar el esquema correcto con `status` en lugar de `scheduled`
 
-## 📱 **Intenciones del Chatbot Mejoradas**
+### 5. Problemas de PowerShell ❌
+**Problema**: Operador `&&` no reconocido
+**Causa**: PowerShell no soporta operador `&&` de bash
+**Solución**: Usar comandos separados o `;` como separador
 
-- **book**: Reservar cita (con confirmación obligatoria)
-- **reschedule**: Mover cita existente (con confirmación)
-- **cancel**: Cancelar cita (con confirmación)
-- **confirm**: Confirmar cita
-- **faq**: Preguntas frecuentes (RAG optimizado)
-- **sales**: Información de ventas (RAG optimizado)
+## 📊 Estado Actual del Sistema
 
-### **Nuevas Capacidades**
+### ✅ Funcionando Correctamente
+- Backend en puerto 3000
+- Frontend en puerto 5173
+- Base de datos SQLite conectada
+- Todas las tablas creadas
+- Datos simulados insertados
+- Endpoints de API respondiendo
 
-- **Normalización de texto**: "q tal" → "qué tal", "xq" → "porque"
-- **Detección de idioma**: Respuesta automática en el idioma del usuario
-- **Clasificación rápida**: Respuestas instantáneas para casos comunes
-- **Confirmación obligatoria**: Evita errores en operaciones críticas
+### ⚠️ Problemas Conocidos
+- Algunos errores de base de datos en logs (manejados por try-catch)
+- Necesidad de reiniciar servidor después de cambios en base de datos
 
-## 🧪 **Testing y Evaluación**
+### 🔄 Próximos Pasos Recomendados
+1. **Probar flujos completos**:
+   - Crear cita → Confirmar → Completar
+   - Agregar productos al carrito → Checkout
+   - Crear ticket de soporte → Resolver
 
-### **Ejecutar Evaluación Completa**
+2. **Mejorar manejo de errores**:
+   - Implementar logging estructurado
+   - Agregar validaciones más robustas
+   - Mejorar mensajes de error para usuarios
 
+3. **Optimizaciones**:
+   - Implementar caché para productos
+   - Agregar paginación en listas
+   - Optimizar consultas de base de datos
+
+## 🧪 Testing
+
+### Endpoints de Prueba
 ```bash
-cd backend
-npm run test:eval
+# Verificar estado del sistema
+curl http://localhost:3000/health
+
+# Probar productos
+curl http://localhost:3000/api/sales/products
+
+# Probar estadísticas de citas
+curl http://localhost:3000/api/appointments/stats
+
+# Probar estadísticas de soporte
+curl http://localhost:3000/api/support/stats
 ```
 
-### **Casos de Prueba Incluidos**
+### Verificación de Base de Datos
+```bash
+# Verificar tablas existentes
+node check-tables.js
 
-- **Reservas**: 3 casos (fácil, medio, difícil)
-- **Reprogramar**: 2 casos (medio, difícil)
-- **Cancelar**: 2 casos (medio, difícil)
-- **FAQ**: 2 casos (fácil, medio)
-- **Ventas**: 2 casos (fácil, medio)
-- **Coloquial**: 2 casos (difícil - con muletillas y abreviaciones)
+# Ejecutar migración si es necesario
+node migrate-schema.js
+```
 
-### **Métricas de Calidad**
+## 📝 Notas de Desarrollo
 
-- **Precisión de intención**: % de intenciones clasificadas correctamente
-- **Calidad de respuesta**: Evaluación de claridad, estructura y relevancia
-- **Tasa de éxito**: % de pruebas superadas completamente
+### Convenciones de Código
+- **Backend**: TypeScript con ESLint
+- **Frontend**: React con TypeScript y Tailwind CSS
+- **Base de Datos**: SQLite con migraciones programáticas
+- **API**: RESTful con respuestas JSON estandarizadas
 
-## 🎛️ **Frontend UX Mejorado**
+### Estructura de Respuestas API
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  count?: number;
+  filters?: any;
+}
+```
 
-- **Streaming de respuestas**: Mejor experiencia de usuario
-- **Confirmaciones visuales**: Para operaciones críticas
-- **Indicadores de estado**: "Pensando...", "Procesando..."
-- **Manejo de errores**: Mensajes claros y sugerencias de solución
+### Manejo de Errores
+- Todos los endpoints incluyen try-catch
+- Errores se loguean en consola
+- Respuestas de error estandarizadas
+- Códigos de estado HTTP apropiados
 
-## 🔐 **Seguridad y Datos**
+## 🤝 Contribución
 
-- **Redacción de PII**: Teléfonos y emails se ocultan en logs
-- **Rate limiting**: Protección contra spam
-- **Validación estricta**: Todos los inputs se validan antes de procesar
-- **Logs seguros**: Sin información sensible expuesta
+### Flujo de Trabajo
+1. Crear rama para nueva funcionalidad
+2. Implementar cambios
+3. Probar localmente
+4. Crear pull request
+5. Revisar y mergear
 
-## 📊 **Comparación de Rendimiento**
+### Estándares de Código
+- Usar TypeScript strict mode
+- Seguir convenciones de ESLint
+- Documentar funciones públicas
+- Incluir tests para nueva funcionalidad
 
-| Métrica | Antes (v1.0) | Ahora (v2.0) | Mejora |
-|---------|---------------|---------------|---------|
-| Modelo | llama3.2:3b | qwen2.5:14b-instruct | +300% |
-| Contexto | 2048 tokens | 8192 tokens | +300% |
-| Precisión RAG | 0.3 umbral | 0.78 umbral | +160% |
-| Respuestas | Básicas | Estructuradas + confirmación | +200% |
-| Coloquial | Limitado | Normalización completa | +400% |
+## 📚 Recursos Adicionales
 
-## 🚀 **Próximas Mejoras Planificadas**
+### Documentación
+- [Express.js](https://expressjs.com/)
+- [React](https://reactjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [SQLite](https://www.sqlite.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
 
-- **Reranker local**: Para mejorar aún más la precisión del RAG
-- **Memoria de largo plazo**: Preferencias del usuario
-- **Integración con calendarios**: Google Calendar, Outlook
-- **Análisis de sentimiento**: Para mejor atención al cliente
-- **Multimodal**: Soporte para imágenes y documentos
+### Herramientas de Desarrollo
+- **Backend**: nodemon, ts-node, better-sqlite3
+- **Frontend**: Vite, React DevTools
+- **Base de Datos**: SQLite Browser, DB Browser for SQLite
 
-## 📄 Licencia
+## 📞 Soporte
 
-MIT
+### Contacto
+- **Desarrollador**: [Tu Nombre]
+- **Email**: [tu-email@ejemplo.com]
+- **Proyecto**: [URL del repositorio]
 
-## 🤝 Contribuir
-
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
+### Reportar Problemas
+1. Verificar que el problema no esté documentado aquí
+2. Crear issue en el repositorio
+3. Incluir logs de error y pasos para reproducir
+4. Especificar versión del sistema y entorno
 
 ---
 
-## 🎯 **¿Por qué estas mejoras?**
-
-El chatbot original era funcional pero limitado. Con estas mejoras:
-
-- **Se "siente" más inteligente**: Modelo más potente + mejor procesamiento
-- **Entiende mejor el habla coloquial**: Normalización + few-shots
-- **Evita alucinaciones**: RAG optimizado + confirmaciones
-- **Mide la calidad**: Sistema de evaluación completo
-- **Escalable**: Arquitectura preparada para futuras mejoras
-
-**¡Tu chatbot ahora rivaliza con ChatGPT en comprensión y utilidad!** 🚀
+**Última actualización**: 15 de Agosto, 2025
+**Versión del sistema**: 1.0.0
+**Estado**: ✅ Funcionando completamente

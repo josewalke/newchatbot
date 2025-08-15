@@ -30,13 +30,21 @@ class DatabaseManager {
       // Crear conexión a la base de datos
       this.db = new Database(config.dbPath);
       
+      // Loggear ruta absoluta de la BD
+      const path = require('path');
+      console.log('📦 SQLite file:', path.resolve(config.dbPath));
+      
       // Configurar opciones de rendimiento
       this.db.pragma('journal_mode = WAL');
       this.db.pragma('synchronous = NORMAL');
       this.db.pragma('cache_size = 10000');
       this.db.pragma('temp_store = MEMORY');
+      this.db.pragma('foreign_keys = ON');
       
       console.log('✅ Base de datos SQLite inicializada correctamente');
+      
+      // Verificar tablas existentes
+      this.verifyTables();
       
       // Ejecutar migraciones
       this.runMigrations();
@@ -48,12 +56,39 @@ class DatabaseManager {
   }
 
   /**
+   * Verifica que todas las tablas requeridas existan
+   */
+  private verifyTables(): void {
+    try {
+      const tables = this.db!.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all();
+      const tableNames = tables.map((t: any) => t.name);
+      
+      console.log('🗂️ Tablas existentes:', tableNames);
+      
+      // Verificar tablas críticas
+      const required = ['customers', 'services', 'appointments', 'knowledge', 'embeddings', 'conversation_sessions', 'conversation_messages'];
+      const missing = required.filter(t => !tableNames.includes(t));
+      
+      if (missing.length > 0) {
+        console.warn('⚠️ Faltan tablas críticas:', missing);
+      } else {
+        console.log('✅ Todas las tablas críticas están presentes');
+      }
+    } catch (error) {
+      console.error('❌ Error al verificar tablas:', error);
+    }
+  }
+
+  /**
    * Ejecuta las migraciones del esquema
    */
   private runMigrations(): void {
     try {
       // Crear tablas si no existen
       this.createTables();
+      
+      // Crear tablas de memoria conversacional si no existen
+      this.createConversationTables();
       
       // Insertar datos de ejemplo si las tablas están vacías
       this.insertSampleData();
@@ -157,15 +192,57 @@ class DatabaseManager {
   }
 
   /**
+   * Crea las tablas de memoria conversacional
+   */
+  private createConversationTables(): void {
+    // Tabla de sesiones de conversación
+    this.db!.exec(`
+      CREATE TABLE IF NOT EXISTS conversation_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sessionId TEXT UNIQUE NOT NULL,
+        userId TEXT,
+        currentTopic TEXT DEFAULT 'general',
+        currentIntent TEXT DEFAULT 'greeting',
+        entities TEXT DEFAULT '{}',
+        context TEXT DEFAULT '{}',
+        active BOOLEAN DEFAULT 1,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Tabla de mensajes de conversación
+    this.db!.exec(`
+      CREATE TABLE IF NOT EXISTS conversation_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sessionId TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+        content TEXT NOT NULL,
+        metadata TEXT DEFAULT '{}',
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sessionId) REFERENCES conversation_sessions(sessionId)
+      )
+    `);
+
+    // Crear índices para memoria conversacional
+    this.db!.exec('CREATE INDEX IF NOT EXISTS idx_conversation_sessions_userId ON conversation_sessions(userId)');
+    this.db!.exec('CREATE INDEX IF NOT EXISTS idx_conversation_sessions_active ON conversation_sessions(active)');
+    this.db!.exec('CREATE INDEX IF NOT EXISTS idx_conversation_messages_sessionId ON conversation_messages(sessionId)');
+    this.db!.exec('CREATE INDEX IF NOT EXISTS idx_conversation_messages_timestamp ON conversation_messages(timestamp)');
+    
+    console.log('✅ Tablas de memoria conversacional creadas/verificadas');
+  }
+
+  /**
    * Inserta datos de ejemplo en las tablas
    */
   private insertSampleData(): void {
     // Insertar servicios de ejemplo
     this.db!.exec(`
       INSERT OR IGNORE INTO services (id, name, duration_min, price_cents, active) VALUES
-        (1, 'Consulta General', 30, 5000, 1),
-        (2, 'Sesión Terapéutica', 60, 8000, 1),
-        (3, 'Evaluación Inicial', 90, 12000, 1)
+        (1, 'Consulta Farmacéutica', 15, 0, 1),
+        (2, 'Medición de Presión', 10, 500, 1),
+        (3, 'Medición de Glucosa', 10, 800, 1)
     `);
 
     // Insertar cliente de ejemplo
@@ -179,9 +256,9 @@ class DatabaseManager {
       INSERT OR IGNORE INTO knowledge (id, source, chunk_text) VALUES
         (1, 'faq.md', '¿Cuáles son los horarios de atención?\n\nNuestros horarios de atención son de lunes a viernes de 9:00 a 18:00, y sábados de 9:00 a 14:00.'),
         (2, 'faq.md', '¿Cómo puedo cancelar una cita?\n\nPuedes cancelar tu cita hasta 24 horas antes de la hora programada. Contacta con nosotros por teléfono o email.'),
-        (3, 'servicios.md', 'Consulta General\n\nNuestra consulta general incluye una evaluación completa de tu situación actual, identificación de necesidades y plan de acción personalizado. Duración: 30 minutos.'),
-        (4, 'servicios.md', 'Sesión Terapéutica\n\nSesión individualizada para trabajar en profundidad en áreas específicas de tu desarrollo personal o profesional. Duración: 60 minutos.'),
-        (5, 'servicios.md', 'Evaluación Inicial\n\nEvaluación completa que incluye entrevista, análisis de necesidades y recomendaciones personalizadas. Duración: 90 minutos.')
+        (3, 'servicios.md', 'Consulta Farmacéutica\n\nNuestra consulta farmacéutica incluye asesoramiento sobre medicamentos, tratamientos y recomendaciones personalizadas. Duración: 15 minutos, GRATIS.'),
+        (4, 'servicios.md', 'Medición de Presión\n\nServicio de control de presión arterial con recomendaciones del farmacéutico. Duración: 10 minutos, 5€.'),
+        (5, 'servicios.md', 'Medición de Glucosa\n\nControl de azúcar en sangre con asesoramiento nutricional. Duración: 10 minutos, 8€.')
     `);
   }
 

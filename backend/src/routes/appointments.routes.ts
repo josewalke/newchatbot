@@ -4,53 +4,35 @@ import { appointmentsController } from '../controllers/appointments.controller';
 const router = Router();
 
 /**
- * @route POST /api/appointments/book
- * @desc Reservar una nueva cita
- * @access Public
+ * Rutas para gestión de citas
  */
-router.post('/book', appointmentsController.bookAppointment);
 
-/**
- * @route POST /api/appointments/reschedule
- * @desc Reprogramar una cita existente
- * @access Public
- */
-router.post('/reschedule', appointmentsController.rescheduleAppointment);
+// Obtener horarios disponibles
+router.get('/available-slots', appointmentsController.getAvailableSlots);
 
-/**
- * @route POST /api/appointments/cancel
- * @desc Cancelar una cita
- * @access Public
- */
-router.post('/cancel', appointmentsController.cancelAppointment);
+// Obtener estadísticas de citas
+router.get('/stats', appointmentsController.getAppointmentStats);
 
-/**
- * @route POST /api/appointments/confirm
- * @desc Confirmar una cita
- * @access Public
- */
-router.post('/confirm', appointmentsController.confirmAppointment);
+// Obtener citas de un cliente
+router.get('/customer/:customerEmail', appointmentsController.getCustomerAppointments);
 
-/**
- * @route GET /api/appointments/availability
- * @desc Obtener disponibilidad de horarios
- * @access Public
- */
-router.get('/availability', appointmentsController.getAvailability);
+// Crear una nueva cita
+router.post('/', appointmentsController.createAppointment);
 
-/**
- * @route GET /api/appointments
- * @desc Obtener todas las citas (con filtros opcionales)
- * @access Public
- */
-router.get('/', appointmentsController.getAllAppointments);
+// Obtener una cita específica
+router.get('/:appointmentId', appointmentsController.getAppointment);
 
-/**
- * @route GET /api/appointments/:id
- * @desc Obtener una cita específica
- * @access Public
- */
-router.get('/:id', appointmentsController.getAppointmentById);
+// Actualizar una cita
+router.put('/:appointmentId', appointmentsController.updateAppointment);
+
+// Cancelar una cita
+router.delete('/:appointmentId', appointmentsController.cancelAppointment);
+
+// Confirmar una cita
+router.post('/:appointmentId/confirm', appointmentsController.confirmAppointment);
+
+// Reprogramar una cita
+router.post('/:appointmentId/reschedule', appointmentsController.rescheduleAppointment);
 
 export default router;
 

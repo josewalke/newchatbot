@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { chatController } from '../controllers/chat.controller';
+import chatEnhancedController from '../controllers/chat.controller';
+import { validateBody } from '../middlewares/validate.middleware';
+import { chatMessageSchema } from '../utils/validators';
 
 const router = Router();
 
@@ -8,35 +10,28 @@ const router = Router();
  * @desc Procesar mensaje de chat
  * @access Public
  */
-router.post('/', chatController.processMessage);
+router.post('/', validateBody(chatMessageSchema), chatEnhancedController.processMessage);
 
 /**
- * @route GET /api/chat/history
- * @desc Obtener historial de mensajes
+ * @route GET /api/chat/stats/:sessionId
+ * @desc Obtener estadísticas de la conversación
  * @access Public
  */
-router.get('/history', chatController.getMessageHistory);
+router.get('/stats/:sessionId', chatEnhancedController.getConversationStats);
 
 /**
- * @route GET /api/chat/stats
- * @desc Obtener estadísticas del chat
+ * @route GET /api/chat/context/:sessionId
+ * @desc Obtener contexto de la conversación
  * @access Public
  */
-router.get('/stats', chatController.getChatStats);
+router.get('/context/:sessionId', chatEnhancedController.getConversationContext);
 
 /**
- * @route GET /api/chat/conversation-state
- * @desc Obtener estado de la conversación
+ * @route GET /api/chat/suggestions/:sessionId
+ * @desc Obtener sugerencias contextuales
  * @access Public
  */
-router.get('/conversation-state', chatController.getConversationState);
-
-/**
- * @route DELETE /api/chat/reset-conversation
- * @desc Resetear conversación de un usuario
- * @access Public
- */
-router.delete('/reset-conversation', chatController.resetConversation);
+router.get('/suggestions/:sessionId', chatEnhancedController.getContextualSuggestions);
 
 export default router;
 

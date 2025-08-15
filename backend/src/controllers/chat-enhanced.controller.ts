@@ -273,7 +273,7 @@ REGLAS DE COMUNICACIÓN:
    * Genera respuesta de fallback
    */
   private generateFallbackResponse(intent: string): string {
-    const fallbacks: Record<string, string> = {
+    const fallbacks = {
       'medication_inquiry': '💊 ¿Qué medicamento específico necesitas? Puedo ayudarte con información sobre medicamentos, precios y requisitos de receta.',
       'appointment_booking': '📅 ¿Qué servicio te gustaría agendar? Tenemos consultas farmacéuticas, mediciones de presión y glucosa.',
       'opening_hours': '🕐 Estamos abiertos 24/7. ¿En qué horario específico necesitas atención?',
@@ -283,7 +283,7 @@ REGLAS DE COMUNICACIÓN:
       'general': '¿En qué puedo ayudarte específicamente? Puedo ayudarte con medicamentos, citas, horarios o precios.'
     };
 
-    return fallbacks[intent] || fallbacks['general'];
+    return fallbacks[intent as keyof typeof fallbacks] || fallbacks['general'];
   }
 
   /**

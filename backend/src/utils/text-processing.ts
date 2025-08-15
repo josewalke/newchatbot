@@ -152,7 +152,7 @@ function extractTimeSlots(text: string): string[] {
 export function askForMissingField(field: 'fecha' | 'servicio' | 'sucursal' | 'hora'): string {
   const questions = {
     fecha: '¿Qué día te viene mejor?',
-    servicio: '¿Qué servicio necesitas? Tenemos Consulta General, Sesión Terapéutica y Evaluación Inicial.',
+          servicio: '¿Qué servicio necesitas? Tenemos Consulta Farmacéutica, Medición de Presión y Consejo Nutricional.',
     sucursal: '¿En qué sucursal prefieres la cita?',
     hora: '¿A qué hora te viene mejor? Tenemos disponibilidad en la mañana y tarde.'
   };
@@ -172,4 +172,103 @@ export function generateConfirmationMessage(operation: string, details: Record<s
   };
   
   return confirmations[operation] || '¿Deseas confirmar esta operación?';
+}
+
+/**
+ * Limpia el texto de respuestas del chatbot para evitar duplicaciones y mejorar la legibilidad
+ */
+export function cleanChatbotResponse(text: string): string {
+  return text
+    // Eliminar confirmaciones duplicadas
+    .replace(/(\s*¿Deseas confirmar\?\s*){2,}/gi, " ¿Deseas confirmar?")
+    .replace(/(\s*¿Te gustaría confirmar\?\s*){2,}/gi, " ¿Te gustaría confirmar?")
+    .replace(/(\s*¿Quieres confirmar\?\s*){2,}/gi, " ¿Quieres confirmar?")
+    
+    // Eliminar espacios múltiples
+    .replace(/\s{2,}/g, " ")
+    
+    // Limpiar saltos de línea múltiples
+    .replace(/\n{3,}/g, "\n\n")
+    
+    // Limpiar puntos múltiples
+    .replace(/\.{3,}/g, "...")
+    
+    // Limpiar signos de exclamación múltiples
+    .replace(/!{2,}/g, "!")
+    
+    // Limpiar signos de interrogación múltiples
+    .replace(/\?{2,}/g, "?")
+    
+    // Limpiar espacios al inicio y final
+    .trim();
+}
+
+/**
+ * Genera respuesta específica para síntomas de garganta con disclaimer de seguridad
+ */
+export function generateThroatSymptomResponse(otcItems: string[]): string {
+  if (otcItems.length === 0) {
+    return `Para el dolor de garganta, te recomiendo consultar con nuestro farmacéutico para obtener recomendaciones personalizadas. Recuerda que si tienes fiebre alta, dificultad para respirar o los síntomas persisten más de 3 días, debes acudir a un profesional médico.`;
+  }
+  
+  const itemsList = otcItems.map(item => `• ${item}`).join('\n');
+  
+  return `Para el dolor de garganta (información general, no es un diagnóstico):
+
+${itemsList}
+
+**⚠️ Importante:** Esta información es solo orientativa. Si experimentas:
+• Fiebre alta (>38°C)
+• Dificultad para respirar
+• Dolor intenso que no mejora
+• Síntomas que persisten más de 3 días
+
+**Debes acudir a un profesional médico o urgencias.**
+
+¿Prefieres que te recomiende opciones de **venta libre** o ver **servicios** de consulta farmacéutica?`;
+}
+
+/**
+ * Genera respuesta para medicamentos específicos con información de reserva
+ */
+export function generateMedicationResponse(medicationName: string, price: string, requiresPrescription: boolean = false): string {
+  if (requiresPrescription) {
+    return `**${medicationName}** - ${price}
+Este medicamento requiere **receta médica**. 
+
+Para obtenerlo necesitas:
+1. 📝 Receta médica válida
+2. 📋 Documento de identidad
+3. 💰 Pago del medicamento
+
+¿Tienes la receta médica o prefieres consultar sobre alternativas de venta libre?`;
+  }
+  
+  return `**${medicationName}** - ${price} [Venta libre]
+
+Este medicamento está disponible **sin receta** (OTC).
+
+¿Quieres **reservarlo para recoger** hoy? Para hacerlo necesito:
+• 📦 **Cantidad** (ej. 1 caja, 2 unidades)
+• 👤 **Tu nombre** para la reserva
+
+*No es una compra online, solo reserva para recoger en farmacia.*`;
+}
+
+/**
+ * Genera respuesta para servicios con información de citas
+ */
+export function generateServiceResponse(serviceName: string, description: string, price: string): string {
+  return `**${serviceName}** - ${price}
+
+${description}
+
+**📅 ¿Quieres agendar una cita?**
+Para reservar necesito:
+• 📅 **Fecha preferida** (hoy, mañana, otro día)
+• 🕐 **Hora aproximada** (mañana, tarde, noche)
+• 👤 **Tu nombre**
+• 📱 **Teléfono de contacto**
+
+¿Te gustaría agendar este servicio?`;
 }

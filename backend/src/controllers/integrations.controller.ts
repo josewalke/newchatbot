@@ -23,10 +23,10 @@ export class IntegrationsController {
       });
 
       // Responder inmediatamente a Telegram (requerido por la API)
-      res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true });
     } catch (error: any) {
       console.error('Error en webhook de Telegram:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Error interno del servidor'
       });
@@ -68,13 +68,13 @@ export class IntegrationsController {
 
       const result = await telegramService.setWebhook(url);
       
-      res.json({
+      return res.json({
         success: true,
         data: result,
         message: 'Webhook configurado exitosamente'
       });
     } catch (error: any) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         error: error.message
       });
@@ -117,13 +117,13 @@ export class IntegrationsController {
 
       const result = await telegramService.sendMessage(chatId, message);
       
-      res.json({
+      return res.json({
         success: true,
         data: result,
         message: 'Mensaje enviado exitosamente'
       });
     } catch (error: any) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         error: error.message
       });
@@ -135,7 +135,8 @@ export class IntegrationsController {
    */
   async getTelegramWebhookInfo(req: Request, res: Response) {
     try {
-      const webhookInfo = await telegramService.getWebhookInfo();
+      // TODO: Implementar getWebhookInfo en TelegramService
+      const webhookInfo = { status: 'not_implemented' };
       
       res.json({
         success: true,

@@ -16,6 +16,11 @@ import appointmentsRoutes from './routes/appointments.routes';
 import knowledgeRoutes from './routes/knowledge.routes';
 import integrationsRoutes from './routes/integrations.routes';
 import servicesRoutes from './routes/services.routes';
+import ragDebugRoutes from './routes/rag-debug.routes';
+import supplementsRoutes from './routes/supplements.routes';
+import healthRoutes from './routes/health.routes';
+import salesManagementRoutes from './routes/sales-management.routes';
+import customerSupportRoutes from './routes/customer-support.routes';
 
 // __dirname y __filename están disponibles en CommonJS
 // No necesitamos import.meta.url
@@ -78,7 +83,7 @@ class Server {
    * Inicializa las rutas de la API
    */
   private initializeRoutes(): void {
-    // Health check
+    // Health check básico
     this.app.get('/health', (req, res) => {
       res.json({
         status: 'ok',
@@ -88,12 +93,19 @@ class Server {
       });
     });
 
+    // Health check detallado
+    this.app.use('/health/detailed', healthRoutes);
+
     // API routes
     this.app.use('/api/chat', chatRoutes);
     this.app.use('/api/appointments', appointmentsRoutes);
     this.app.use('/api/knowledge', knowledgeRoutes);
     this.app.use('/api/services', servicesRoutes);
+    this.app.use('/api/supplements', supplementsRoutes);
     this.app.use('/integrations', integrationsRoutes);
+    this.app.use('/api/rag', ragDebugRoutes);
+    this.app.use('/api/sales', salesManagementRoutes);
+    this.app.use('/api/support', customerSupportRoutes);
 
     // Ruta para el embed de WordPress
     this.app.get('/embed.html', (req, res) => {

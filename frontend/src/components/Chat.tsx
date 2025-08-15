@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import Typing from './Typing';
-import { sendMessage } from '../lib/api';
+import { chatAPI } from '../lib/api';
 
 interface Message {
   id: string;
@@ -63,9 +63,12 @@ const Chat: React.FC<ChatProps> = ({ userId = 'anonymous', channel = 'web' }) =>
     setIsLoading(true);
 
     try {
-      const response = await sendMessage(inputValue.trim(), {
-        userId,
-        channel,
+      const response = await chatAPI.sendMessage({
+        message: inputValue.trim(),
+        meta: {
+          userId,
+          channel,
+        },
       });
 
       const botMessage: Message = {

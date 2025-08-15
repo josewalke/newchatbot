@@ -24,22 +24,49 @@ interface RAGResult {
 }
 
 /**
- * Servicio de RAG (Retrieval Augmented Generation) mejorado
+ * Servicio de RAG (Retrieval Augmented Generation) mejorado con búsqueda híbrida
  */
 export class RAGService {
   /**
-   * Busca chunks de conocimiento relevantes para una consulta
+   * Expande consultas genéricas para mejorar la búsqueda
+   */
+  expandQuery(query: string): string {
+    const lowerQuery = query.toLowerCase();
+    
+    // Expansión para consultas farmacéuticas
+    if (lowerQuery.includes('medicamento') || lowerQuery.includes('medicina')) {
+      return query + ' fármacos dispensación receta OTC posología principio activo efectos secundarios';
+    }
+    
+    if (lowerQuery.includes('servicio') || lowerQuery.includes('servicios')) {
+      return query + ' consulta farmacéutica medición presión glucosa vacunación consejo nutricional';
+    }
+    
+    if (lowerQuery.includes('horario') || lowerQuery.includes('horarios')) {
+      return query + ' farmacia 24/7 atención nocturna emergencia disponible';
+    }
+    
+    if (lowerQuery.includes('precio') || lowerQuery.includes('costo')) {
+      return query + ' euros coste tarifa consulta gratuita medición';
+    }
+    
+    return query;
+  }
+
+  /**
+   * Búsqueda vectorial mejorada con umbrales optimizados
    */
   async search(
     query: string,
-    k: number = 4, // Reducido de 5 a 4 para mayor precisión
-    minScore: number = 0.78 // Aumentado de 0.3 a 0.78 para evitar ruido
+    k: number = 8, // Aumentado para mejor cobertura
+    minScore: number = 0.25 // Reducido para capturar más resultados
   ): Promise<RAGResult> {
     try {
+      console.log(`🔍 RAG Search: "${query}" - k=${k}, minScore=${minScore}`);
+      
       // Generar embeddings para la consulta
       const queryEmbedding = await llmService.generateEmbeddings(query);
       
-      // Validar que se generaron embeddings
       if (!queryEmbedding || !Array.isArray(queryEmbedding)) {
         console.warn('No se pudieron generar embeddings para la consulta:', query);
         return {
@@ -51,6 +78,7 @@ export class RAGService {
       }
       
       const normalizedQueryEmbedding = normalizeVector(queryEmbedding);
+      console.log(`✅ Embedding generado: ${normalizedQueryEmbedding.length} dimensiones`);
 
       // Obtener todos los embeddings de la base de datos
       const embeddings = dbManager.query<{
@@ -62,6 +90,7 @@ export class RAGService {
       );
 
       if (embeddings.length === 0) {
+        console.warn('No hay embeddings en la base de datos');
         return {
           chunks: [],
           totalScore: 0,
@@ -69,6 +98,8 @@ export class RAGService {
           hasRelevantContext: false,
         };
       }
+
+      console.log(`📊 Comparando con ${embeddings.length} embeddings`);
 
       // Convertir embeddings de JSON a arrays
       const embeddingVectors = embeddings.map(emb => ({
@@ -77,27 +108,71 @@ export class RAGService {
         vector: JSON.parse(emb.vector_json) as number[],
       }));
 
-      // Buscar más candidatos inicialmente para luego filtrar
+      // Buscar similitud con más candidatos
       const initialK = Math.min(k * 2, embeddingVectors.length);
-      
-      // Encontrar los más similares
       const similarities = findTopKSimilar(
         normalizedQueryEmbedding,
         embeddingVectors.map(emb => emb.vector),
         initialK
       );
 
-      // Filtrar por umbral de similitud más estricto
+      console.log(`🔍 Similitudes encontradas: ${similarities.length}`);
+
+      // Filtrar por umbral y ordenar
       const filteredSimilarities = similarities
         .filter(sim => sim.score >= minScore)
+        .sort((a, b) => b.score - a.score)
         .slice(0, k);
 
+      console.log(`✅ Chunks filtrados: ${filteredSimilarities.length} (umbral ${minScore})`);
+
       if (filteredSimilarities.length === 0) {
+        // Fallback con umbral más bajo
+        const fallbackSimilarities = similarities
+          .filter(sim => sim.score >= 0.20) // Umbral de fallback más bajo
+          .sort((a, b) => b.score - a.score)
+          .slice(0, k);
+        
+        console.log(`🔄 Fallback con umbral 0.20: ${fallbackSimilarities.length} chunks`);
+        
+        if (fallbackSimilarities.length === 0) {
+          return {
+            chunks: [],
+            totalScore: 0,
+            sources: [],
+            hasRelevantContext: false,
+          };
+        }
+        
+        // Usar resultados de fallback
+        const fallbackChunkIds = fallbackSimilarities.map(sim => 
+          embeddingVectors[sim.index].knowledgeId
+        );
+        
+        const fallbackChunks = dbManager.query<KnowledgeChunk>(
+          'SELECT id, source, chunk_text FROM knowledge WHERE id IN (' +
+          fallbackChunkIds.map(() => '?').join(',') + ')',
+          fallbackChunkIds
+        );
+        
+        const fallbackChunksWithScores = fallbackChunks.map(chunk => {
+          const similarity = fallbackSimilarities.find(sim => 
+            embeddingVectors[sim.index].knowledgeId === chunk.id
+          );
+          return {
+            ...chunk,
+            score: similarity?.score || 0,
+          };
+        });
+        
+        const totalScore = fallbackChunksWithScores.reduce((sum, chunk) => sum + (chunk.score || 0), 0);
+        const sources = [...new Set(fallbackChunksWithScores.map(chunk => chunk.source))];
+        
         return {
-          chunks: [],
-          totalScore: 0,
-          sources: [],
-          hasRelevantContext: false,
+          chunks: fallbackChunksWithScores,
+          totalScore,
+          sources,
+          hasRelevantContext: true,
         };
       }
 
@@ -106,7 +181,6 @@ export class RAGService {
         embeddingVectors[sim.index].knowledgeId
       );
 
-      // Obtener los chunks de conocimiento
       const chunks = dbManager.query<KnowledgeChunk>(
         'SELECT id, source, chunk_text FROM knowledge WHERE id IN (' +
         chunkIds.map(() => '?').join(',') + ')',
@@ -130,6 +204,8 @@ export class RAGService {
       const totalScore = chunksWithScores.reduce((sum, chunk) => sum + (chunk.score || 0), 0);
       const sources = [...new Set(chunksWithScores.map(chunk => chunk.source))];
 
+      console.log(`🎯 Resultados finales: ${chunksWithScores.length} chunks, score total: ${totalScore.toFixed(3)}`);
+
       return {
         chunks: chunksWithScores,
         totalScore,
@@ -143,10 +219,166 @@ export class RAGService {
   }
 
   /**
+   * Búsqueda híbrida: vector + texto (BM25 simplificado)
+   */
+  async hybridSearch(
+    query: string,
+    k: number = 8,
+    minScore: number = 0.22
+  ): Promise<RAGResult> {
+    try {
+      console.log(`🔍 Hybrid Search: "${query}" - k=${k}, minScore=${minScore}`);
+      
+      // 1. Búsqueda vectorial
+      const vectorResults = await this.search(query, k, minScore);
+      
+      // 2. Búsqueda por texto (simulación de BM25)
+      const textResults = await this.textSearch(query, k);
+      
+      // 3. Fusionar resultados
+      const mergedResults = this.mergeResults(vectorResults, textResults, k);
+      
+      console.log(`🔄 Hybrid: Vector=${vectorResults.chunks.length}, Text=${textResults.chunks.length}, Merged=${mergedResults.chunks.length}`);
+      
+      return mergedResults;
+    } catch (error) {
+      console.error('Error en búsqueda híbrida:', error);
+      // Fallback a búsqueda vectorial simple
+      return this.search(query, k, minScore);
+    }
+  }
+
+  /**
+   * Búsqueda por texto (simulación de BM25)
+   */
+  private async textSearch(query: string, k: number): Promise<RAGResult> {
+    try {
+      const lowerQuery = query.toLowerCase();
+      const queryWords = lowerQuery.split(/\s+/).filter(word => word.length > 2);
+      
+      if (queryWords.length === 0) {
+        return {
+          chunks: [],
+          totalScore: 0,
+          sources: [],
+          hasRelevantContext: false,
+        };
+      }
+
+      // Obtener todos los chunks
+      const allChunks = dbManager.query<KnowledgeChunk>(
+        'SELECT id, source, chunk_text FROM knowledge'
+      );
+
+      // Calcular score de texto para cada chunk
+      const scoredChunks = allChunks.map(chunk => {
+        const lowerText = chunk.chunk_text.toLowerCase();
+        let score = 0;
+        
+        // Score por palabras coincidentes
+        queryWords.forEach(word => {
+          const wordCount = (lowerText.match(new RegExp(word, 'g')) || []).length;
+          score += wordCount * 0.1;
+        });
+        
+        // Score por coincidencia exacta de frase
+        if (lowerText.includes(lowerQuery)) {
+          score += 0.5;
+        }
+        
+        // Score por fuente relevante
+        if (chunk.source.includes('productos') && query.includes('medicamento')) {
+          score += 0.3;
+        }
+        if (chunk.source.includes('servicios') && query.includes('servicio')) {
+          score += 0.3;
+        }
+        if (chunk.source.includes('horarios') && query.includes('horario')) {
+          score += 0.3;
+        }
+        
+        return { ...chunk, score };
+      });
+
+      // Filtrar y ordenar por score
+      const relevantChunks = scoredChunks
+        .filter(chunk => chunk.score > 0)
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, k);
+
+      const totalScore = relevantChunks.reduce((sum, chunk) => sum + (chunk.score || 0), 0);
+      const sources = [...new Set(relevantChunks.map(chunk => chunk.source))];
+
+      return {
+        chunks: relevantChunks,
+        totalScore,
+        sources,
+        hasRelevantContext: relevantChunks.length > 0,
+      };
+    } catch (error) {
+      console.error('Error en búsqueda de texto:', error);
+      return {
+        chunks: [],
+        totalScore: 0,
+        sources: [],
+        hasRelevantContext: false,
+      };
+    }
+  }
+
+  /**
+   * Fusiona resultados de búsqueda vectorial y textual
+   */
+  private mergeResults(vectorResults: RAGResult, textResults: RAGResult, k: number): RAGResult {
+    const merged = new Map<number, KnowledgeChunk>();
+    
+    // Agregar resultados vectoriales (peso 0.7)
+    vectorResults.chunks.forEach(chunk => {
+      merged.set(chunk.id, {
+        ...chunk,
+        score: (chunk.score || 0) * 0.7
+      });
+    });
+    
+    // Agregar resultados textuales (peso 0.3)
+    textResults.chunks.forEach(chunk => {
+      if (merged.has(chunk.id)) {
+        // Combinar scores
+        const existing = merged.get(chunk.id)!;
+        merged.set(chunk.id, {
+          ...existing,
+          score: (existing.score || 0) + (chunk.score || 0) * 0.3
+        });
+      } else {
+        merged.set(chunk.id, {
+          ...chunk,
+          score: (chunk.score || 0) * 0.3
+        });
+      }
+    });
+    
+    // Ordenar por score combinado
+    const mergedChunks = Array.from(merged.values())
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, k);
+    
+    const totalScore = mergedChunks.reduce((sum, chunk) => sum + (chunk.score || 0), 0);
+    const sources = [...new Set(mergedChunks.map(chunk => chunk.source))];
+    
+    return {
+      chunks: mergedChunks,
+      totalScore,
+      sources,
+      hasRelevantContext: mergedChunks.length > 0,
+    };
+  }
+
+  /**
    * Genera contexto para el LLM basado en los chunks encontrados
    */
   async generateContext(query: string, maxChunks: number = 4): Promise<string> {
-    const result = await this.search(query, maxChunks);
+    // Usar búsqueda híbrida para mejor cobertura
+    const result = await this.hybridSearch(query, maxChunks, 0.20);
     
     if (!result.hasRelevantContext) {
       return "No tengo información específica sobre tu consulta. Te sugiero contactar directamente con nuestro equipo para obtener la información más actualizada.";
@@ -155,10 +387,11 @@ export class RAGService {
     // Crear contexto estructurado
     const contextParts = result.chunks.map(chunk => {
       const source = chunk.source.replace(/\.(md|txt|pdf)$/, '');
-      return `• ${source}:\n${chunk.chunk_text}`;
+      const score = chunk.score ? ` (relevancia: ${chunk.score.toFixed(3)})` : '';
+      return `• ${source}${score}:\n${chunk.chunk_text}`;
     });
 
-    return `Información relevante:\n\n${contextParts.join('\n\n')}`;
+    return `Información relevante encontrada:\n\n${contextParts.join('\n\n')}`;
   }
 
   /**
@@ -370,6 +603,45 @@ Responde basándote únicamente en esta información:`;
         totalChunks: 0,
         totalSources: 0,
         totalEmbeddings: 0,
+      };
+    }
+  }
+
+  /**
+   * Obtiene información de la base de datos para depuración
+   */
+  async getDatabaseInfo(): Promise<any> {
+    try {
+      const knowledgeCount = dbManager.queryFirst<{ count: number }>(
+        'SELECT COUNT(*) as count FROM knowledge'
+      )?.count || 0;
+      
+      const embeddingsCount = dbManager.queryFirst<{ count: number }>(
+        'SELECT COUNT(*) as count FROM embeddings'
+      )?.count || 0;
+      
+      const servicesCount = dbManager.queryFirst<{ count: number }>(
+        'SELECT COUNT(*) as count FROM services'
+      )?.count || 0;
+      
+      const knowledgeBySource = dbManager.query(
+        'SELECT source, COUNT(*) as count FROM knowledge GROUP BY source'
+      );
+      
+      return {
+        knowledge: {
+          total: knowledgeCount,
+          bySource: knowledgeBySource
+        },
+        embeddings: embeddingsCount,
+        services: servicesCount,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error al obtener información de BD:', error);
+      return { 
+        error: error instanceof Error ? error.message : 'Error desconocido',
+        timestamp: new Date().toISOString()
       };
     }
   }

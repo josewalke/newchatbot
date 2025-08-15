@@ -117,20 +117,25 @@ export function validateFileUpload(options: {
       
       // Validar cada archivo
       for (const file of files) {
-        // Validar tamaño
-        if (options.maxSize && file.size > options.maxSize) {
-          throw new OperationalError(
-            `El archivo ${file.name} excede el tamaño máximo de ${options.maxSize} bytes`,
-            400
-          );
-        }
-        
-        // Validar tipo
-        if (options.allowedTypes && !options.allowedTypes.includes(file.mimetype)) {
-          throw new OperationalError(
-            `El tipo de archivo ${file.mimetype} no está permitido`,
-            400
-          );
+        // Verificar que el archivo tenga las propiedades necesarias
+        if (typeof file === 'object' && file !== null) {
+          const fileObj = file as any;
+          
+          // Validar tamaño
+          if (options.maxSize && fileObj.size && fileObj.size > options.maxSize) {
+            throw new OperationalError(
+              `El archivo ${fileObj.name || 'desconocido'} excede el tamaño máximo de ${options.maxSize} bytes`,
+              400
+            );
+          }
+          
+          // Validar tipo
+          if (options.allowedTypes && fileObj.mimetype && !options.allowedTypes.includes(fileObj.mimetype)) {
+            throw new OperationalError(
+              `El tipo de archivo ${fileObj.mimetype} no está permitido`,
+              400
+            );
+          }
         }
       }
       

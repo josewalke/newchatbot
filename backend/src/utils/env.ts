@@ -9,7 +9,11 @@ export const config = {
   // Ollama
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'chatbot-optimized',
-  embedModel: process.env.EMBED_MODEL || 'nomic-embed-text',
+  
+  // Embeddings
+  embeddingsProvider: process.env.EMBEDDINGS_PROVIDER || 'ollama',
+  embeddingsModel: process.env.EMBEDDINGS_MODEL || 'nomic-embed-text',
+  ollamaHost: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
   
   // Telegram
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',

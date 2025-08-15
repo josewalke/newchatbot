@@ -1,397 +1,443 @@
 import dbManager from '../db/db';
+import llmService from './llm.service';
+import appointmentsService from './appointments.service';
 import { OperationalError } from '../middlewares/error.middleware';
-import { formatDateTime } from '../utils/time';
 
 /**
- * Interfaz para un servicio
+ * Interfaz para el proceso de venta
  */
-interface Service {
-  id: number;
-  name: string;
-  duration_min: number;
-  price_cents: number;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
+interface SalesProcess {
+  stage: 'awareness' | 'interest' | 'desire' | 'action' | 'closing';
+  customerId?: number;
+  serviceId?: number;
+  objections: string[];
+  benefits: string[];
+  urgency: number; // 1-10
+  budget: number;
+  timeline: string;
 }
 
 /**
- * Interfaz para información de ventas
+ * Interfaz para propuestas de venta
  */
-interface SalesInfo {
-  service: Service;
-  formattedPrice: string;
-  paymentInstructions: string;
-  ctaText: string;
+interface SalesProposal {
+  serviceId: number;
+  serviceName: string;
+  price: number;
+  duration: number;
+  benefits: string[];
+  urgency: string;
+  specialOffer?: string;
+  nextStep: string;
 }
 
 /**
- * Servicio para gestión de ventas y servicios
+ * Servicio de ventas automáticas para el chatbot
  */
 export class SalesService {
+  
   /**
-   * Obtiene todos los servicios activos
+   * Inicia el proceso de venta
    */
-  async getActiveServices(): Promise<Service[]> {
-    try {
-      return dbManager.query<Service>(
-        'SELECT * FROM services WHERE active = 1 ORDER BY price_cents ASC'
-      );
-    } catch (error) {
-      console.error('Error al obtener servicios:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Obtiene un servicio por ID
-   */
-  async getServiceById(id: number): Promise<Service | null> {
-    try {
-      const result = dbManager.queryFirst<Service>(
-        'SELECT * FROM services WHERE id = ? AND active = 1',
-        [id]
-      );
-      return result || null;
-    } catch (error) {
-      console.error('Error al obtener servicio:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Crea un nuevo servicio
-   */
-  async createService(data: {
-    name: string;
-    duration_min: number;
-    price_cents: number;
-  }): Promise<Service> {
-    try {
-      const result = dbManager.run(
-        'INSERT INTO services (name, duration_min, price_cents, active) VALUES (?, ?, ?, 1)',
-        [data.name, data.duration_min, data.price_cents]
-      );
-
-      const serviceId = Number(result.lastInsertRowid);
-      const service = await this.getServiceById(serviceId);
-      
-      if (!service) {
-        throw new OperationalError('Error al crear el servicio', 500);
-      }
-
-      return service;
-    } catch (error) {
-      if (error instanceof OperationalError) {
-        throw error;
-      }
-      console.error('Error al crear servicio:', error);
-      throw new OperationalError('Error interno al crear el servicio', 500);
-    }
-  }
-
-  /**
-   * Actualiza un servicio existente
-   */
-  async updateService(
-    id: number,
-    data: Partial<{
-      name: string;
-      duration_min: number;
-      price_cents: number;
-      active: boolean;
-    }>
-  ): Promise<Service> {
-    try {
-      // Verificar que el servicio existe
-      const existingService = await this.getServiceById(id);
-      if (!existingService) {
-        throw new OperationalError('Servicio no encontrado', 404);
-      }
-
-      // Construir query de actualización dinámicamente
-      const updates: string[] = [];
-      const values: any[] = [];
-
-      if (data.name !== undefined) {
-        updates.push('name = ?');
-        values.push(data.name);
-      }
-
-      if (data.duration_min !== undefined) {
-        updates.push('duration_min = ?');
-        values.push(data.duration_min);
-      }
-
-      if (data.price_cents !== undefined) {
-        updates.push('price_cents = ?');
-        values.push(data.price_cents);
-      }
-
-      if (data.active !== undefined) {
-        updates.push('active = ?');
-        values.push(data.active ? 1 : 0);
-      }
-
-      if (updates.length === 0) {
-        return existingService;
-      }
-
-      updates.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(id);
-
-      const query = `UPDATE services SET ${updates.join(', ')} WHERE id = ?`;
-      dbManager.run(query, values);
-
-      // Obtener el servicio actualizado
-      const updatedService = await this.getServiceById(id);
-      if (!updatedService) {
-        throw new OperationalError('Error al actualizar el servicio', 500);
-      }
-
-      return updatedService;
-    } catch (error) {
-      if (error instanceof OperationalError) {
-        throw error;
-      }
-      console.error('Error al actualizar servicio:', error);
-      throw new OperationalError('Error interno al actualizar el servicio', 500);
-    }
-  }
-
-  /**
-   * Elimina un servicio (lo marca como inactivo)
-   */
-  async deleteService(id: number): Promise<{ success: boolean; message: string }> {
-    try {
-      // Verificar que el servicio existe
-      const existingService = await this.getServiceById(id);
-      if (!existingService) {
-        throw new OperationalError('Servicio no encontrado', 404);
-      }
-
-      // Marcar como inactivo en lugar de eliminar
-      dbManager.run(
-        'UPDATE services SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [id]
-      );
-
-      return { success: true, message: 'Servicio eliminado exitosamente' };
-    } catch (error) {
-      if (error instanceof OperationalError) {
-        throw error;
-      }
-      console.error('Error al eliminar servicio:', error);
-      throw new OperationalError('Error interno al eliminar el servicio', 500);
-    }
-  }
-
-  /**
-   * Obtiene información de ventas para un servicio específico
-   */
-  async getSalesInfo(serviceId: number): Promise<SalesInfo> {
-    try {
-      const service = await this.getServiceById(serviceId);
-      if (!service) {
-        throw new OperationalError('Servicio no encontrado', 404);
-      }
-
-      const formattedPrice = this.formatPrice(service.price_cents);
-      const paymentInstructions = this.getPaymentInstructions();
-      const ctaText = this.getCTAText(service);
-
-      return {
-        service,
-        formattedPrice,
-        paymentInstructions,
-        ctaText,
-      };
-    } catch (error) {
-      if (error instanceof OperationalError) {
-        throw error;
-      }
-      console.error('Error al obtener información de ventas:', error);
-      throw new OperationalError('Error interno al obtener información de ventas', 500);
-    }
-  }
-
-  /**
-   * Obtiene información de ventas para un tema específico
-   */
-  async getSalesInfoByTopic(topic: string): Promise<SalesInfo[]> {
-    try {
-      // Buscar servicios que coincidan con el tema
-      const services = dbManager.query<Service>(
-        'SELECT * FROM services WHERE active = 1 AND (name LIKE ? OR name LIKE ?) ORDER BY price_cents ASC',
-        [`%${topic}%`, `%${topic.toLowerCase()}%`]
-      );
-
-      if (services.length === 0) {
-        // Si no hay coincidencias específicas, devolver todos los servicios activos
-        return this.getAllServicesSalesInfo();
-      }
-
-      return services.map(service => ({
-        service,
-        formattedPrice: this.formatPrice(service.price_cents),
-        paymentInstructions: this.getPaymentInstructions(),
-        ctaText: this.getCTAText(service),
-      }));
-    } catch (error) {
-      console.error('Error al obtener información de ventas por tema:', error);
-      return this.getAllServicesSalesInfo();
-    }
-  }
-
-  /**
-   * Obtiene información de ventas para todos los servicios
-   */
-  async getAllServicesSalesInfo(): Promise<SalesInfo[]> {
-    try {
-      const services = await this.getActiveServices();
-      
-      return services.map(service => ({
-        service,
-        formattedPrice: this.formatPrice(service.price_cents),
-        paymentInstructions: this.getPaymentInstructions(),
-        ctaText: this.getCTAText(service),
-      }));
-    } catch (error) {
-      console.error('Error al obtener información de ventas de todos los servicios:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Genera una propuesta de venta personalizada
-   */
-  async generateSalesProposal(
-    serviceId?: number,
-    topic?: string,
-    customerName?: string
-  ): Promise<string> {
-    try {
-      let salesInfo: SalesInfo[];
-
-      if (serviceId) {
-        const info = await this.getSalesInfo(serviceId);
-        salesInfo = [info];
-      } else if (topic) {
-        salesInfo = await this.getSalesInfoByTopic(topic);
-      } else {
-        salesInfo = await this.getAllServicesSalesInfo();
-      }
-
-      if (salesInfo.length === 0) {
-        return 'Lo siento, no tengo servicios disponibles en este momento.';
-      }
-
-      // Generar propuesta personalizada
-      const greeting = customerName ? `¡Hola ${customerName}!` : '¡Hola!';
-      
-      let proposal = `${greeting} Te presento nuestros servicios:\n\n`;
-
-      for (const info of salesInfo) {
-        const duration = info.service.duration_min >= 60 
-          ? `${Math.floor(info.service.duration_min / 60)}h ${info.service.duration_min % 60}min`
-          : `${info.service.duration_min} minutos`;
-
-        proposal += `🌟 **${info.service.name}**\n`;
-        proposal += `⏱️ Duración: ${duration}\n`;
-        proposal += `💰 Precio: ${info.formattedPrice}\n`;
-        proposal += `💳 ${info.paymentInstructions}\n\n`;
-      }
-
-      proposal += `🎯 ${salesInfo[0].ctaText}\n\n`;
-      proposal += '¿Te gustaría que te ayude a reservar una cita?';
-
-      return proposal;
-    } catch (error) {
-      console.error('Error al generar propuesta de ventas:', error);
-      return 'Lo siento, no puedo generar la propuesta en este momento. ¿Puedes contactar con nuestro equipo?';
-    }
-  }
-
-  /**
-   * Formatea el precio en formato legible
-   */
-  private formatPrice(priceCents: number): string {
-    if (priceCents === 0) {
-      return 'Gratis';
-    }
-
-    const euros = priceCents / 100;
-    return `${euros.toFixed(2)}€`;
-  }
-
-  /**
-   * Obtiene las instrucciones de pago
-   */
-  private getPaymentInstructions(): string {
-    // En una implementación real, esto vendría de configuración
-    const hasStripe = process.env.STRIPE_PUBLIC_KEY;
-    
-    if (hasStripe) {
-      return 'Pago seguro online con tarjeta';
-    } else {
-      return 'Pago por transferencia bancaria';
-    }
-  }
-
-  /**
-   * Genera el texto de call-to-action
-   */
-  private getCTAText(service: Service): string {
-    const duration = service.duration_min >= 60 
-      ? `${Math.floor(service.duration_min / 60)} hora${Math.floor(service.duration_min / 60) > 1 ? 's' : ''}`
-      : `${service.duration_min} minutos`;
-
-    return `Reserva tu ${service.name} de ${duration} ahora mismo`;
-  }
-
-  /**
-   * Obtiene estadísticas de servicios
-   */
-  async getServiceStats(): Promise<{
-    totalServices: number;
-    activeServices: number;
-    averagePrice: number;
-    totalRevenue: number;
+  async startSalesProcess(userMessage: string, userId: string): Promise<{
+    stage: string;
+    message: string;
+    nextAction: string;
+    proposals?: SalesProposal[];
   }> {
     try {
-      const totalServices = dbManager.queryFirst<{ count: number }>(
-        'SELECT COUNT(*) as count FROM services'
-      )?.count || 0;
-
-      const activeServices = dbManager.queryFirst<{ count: number }>(
-        'SELECT COUNT(*) as count FROM services WHERE active = 1'
-      )?.count || 0;
-
-      const priceStats = dbManager.queryFirst<{ 
-        avg_price: number; 
-        total_revenue: number 
-      }>(
-        'SELECT AVG(price_cents) as avg_price, SUM(price_cents) as total_revenue FROM services WHERE active = 1'
-      );
-
+      // Analizar la intención del usuario
+      const intent = await this.analyzeSalesIntent(userMessage);
+      
+      // Determinar la etapa del proceso de venta
+      const stage = this.determineSalesStage(userMessage, intent);
+      
+      // Generar respuesta apropiada para la etapa
+      const response = await this.generateStageResponse(stage, intent, userId);
+      
+      // Generar propuestas de venta si es apropiado
+      const proposals = stage === 'desire' || stage === 'action' 
+        ? await this.generateSalesProposals(intent, userId)
+        : undefined;
+      
       return {
-        totalServices,
-        activeServices,
-        averagePrice: priceStats?.avg_price || 0,
-        totalRevenue: priceStats?.total_revenue || 0,
+        stage,
+        message: response,
+        nextAction: this.getNextAction(stage),
+        proposals
       };
+      
     } catch (error) {
-      console.error('Error al obtener estadísticas de servicios:', error);
+      console.error('Error en proceso de venta:', error);
+      throw new OperationalError('Error en el proceso de venta', 500);
+    }
+  }
+
+  /**
+   * Analiza la intención de venta del usuario
+   */
+  private async analyzeSalesIntent(message: string): Promise<{
+    service: string;
+    urgency: number;
+    budget: number;
+    timeline: string;
+    objections: string[];
+  }> {
+    const prompt = `Analiza la siguiente intención de compra y extrae:
+    - Servicio deseado
+    - Urgencia (1-10)
+    - Presupuesto aproximado
+    - Timeline
+    - Posibles objeciones
+    
+    Mensaje: "${message}"
+    
+    Responde en formato JSON:
+    {
+      "service": "nombre del servicio",
+      "urgency": número,
+      "budget": número,
+      "timeline": "texto",
+      "objections": ["objeción1", "objeción2"]
+    }`;
+    
+    const response = await llmService.generateResponse(prompt, undefined, 0.3);
+    
+    try {
+      return JSON.parse(response);
+    } catch {
+      // Fallback si no se puede parsear
       return {
-        totalServices: 0,
-        activeServices: 0,
-        averagePrice: 0,
-        totalRevenue: 0,
+        service: 'consulta farmacéutica',
+        urgency: 5,
+        budget: 100,
+        timeline: 'próximas semanas',
+        objections: []
+      };
+    }
+  }
+
+  /**
+   * Determina la etapa del proceso de venta
+   */
+  private determineSalesStage(message: string, intent: any): string {
+    const lowerMessage = message.toLowerCase();
+    
+    // Palabras clave para cada etapa
+    if (lowerMessage.includes('qué') || lowerMessage.includes('cuáles') || lowerMessage.includes('información')) {
+      return 'awareness';
+    }
+    
+    if (lowerMessage.includes('me gustaría') || lowerMessage.includes('interesado') || lowerMessage.includes('precio')) {
+      return 'interest';
+    }
+    
+    if (lowerMessage.includes('necesito') || lowerMessage.includes('urgente') || lowerMessage.includes('problema')) {
+      return 'desire';
+    }
+    
+    if (lowerMessage.includes('reservar') || lowerMessage.includes('cita') || lowerMessage.includes('agendar')) {
+      return 'action';
+    }
+    
+    if (lowerMessage.includes('confirmar') || lowerMessage.includes('pagar') || lowerMessage.includes('finalizar')) {
+      return 'closing';
+    }
+    
+    return 'interest'; // Por defecto
+  }
+  
+  /**
+   * Genera respuesta apropiada para cada etapa
+   */
+  private async generateStageResponse(stage: string, intent: any, userId: string): Promise<string> {
+    switch (stage) {
+      case 'awareness':
+        return this.generateAwarenessResponse(intent);
+      
+      case 'interest':
+        return this.generateInterestResponse(intent);
+      
+      case 'desire':
+        return this.generateDesireResponse(intent);
+      
+      case 'action':
+        return this.generateActionResponse(intent, userId);
+      
+      case 'closing':
+        return this.generateClosingResponse(intent, userId);
+      
+      default:
+        return this.generateInterestResponse(intent);
+    }
+  }
+
+  /**
+   * Genera respuesta para etapa de conciencia
+   */
+  private generateAwarenessResponse(intent: any): string {
+    return `¡Perfecto! 🌟 Te explico nuestros servicios especializados:\n\n` +
+           `**🌟 Consulta Farmacéutica (GRATIS - 15 min)**\n` +
+           `• Evaluación completa de tu situación\n` +
+           `• Identificación de necesidades específicas\n` +
+           `• Plan de acción personalizado\n\n` +
+           `**🌟 Sesión Terapéutica (80€ - 60 min)**\n` +
+           `• Trabajo en profundidad en áreas específicas\n` +
+           `• Técnicas personalizadas para tu caso\n` +
+           `• Seguimiento continuo de progreso\n\n` +
+           `**🌟 Evaluación Inicial (120€ - 90 min)**\n` +
+           `• Evaluación completa y detallada\n` +
+           `• Recomendaciones personalizadas\n` +
+           `• Plan de tratamiento a largo plazo\n\n` +
+           `¿Cuál de estos servicios te interesa más? 🤔`;
+  }
+  
+  /**
+   * Genera respuesta para etapa de interés
+   */
+  private generateInterestResponse(intent: any): string {
+            const service = intent.service || 'consulta farmacéutica';
+    
+    return `¡Excelente elección! 🎯 El servicio de **${service}** es perfecto para tu caso.\n\n` +
+           `**¿Por qué es ideal para ti?**\n` +
+           `• ✅ Resultados comprobados en casos similares\n` +
+           `• ✅ Enfoque personalizado y adaptado\n` +
+           `• ✅ Flexibilidad de horarios\n` +
+           `• ✅ Seguimiento continuo\n\n` +
+           `**¿Te gustaría conocer más detalles específicos** sobre este servicio o prefieres que te ayude a **agendar una cita** directamente? 📅`;
+  }
+  
+  /**
+   * Genera respuesta para etapa de deseo
+   */
+  private generateDesireResponse(intent: any): string {
+    const urgency = intent.urgency || 5;
+    
+    if (urgency >= 8) {
+      return `¡Entiendo la urgencia! 🚨 Es importante actuar rápido para mejores resultados.\n\n` +
+             `**Oferta especial por urgencia:**\n` +
+             `• 📅 Cita en las próximas 24-48 horas\n` +
+             `• 💰 15% de descuento en la primera sesión\n` +
+             `• ⚡ Prioridad en el calendario\n\n` +
+             `**¿Quieres que reserve tu cita AHORA MISMO** para aprovechar esta oferta especial? 🎯`;
+    }
+    
+    return `¡Perfecto! 🎉 Veo que estás listo para tomar acción.\n\n` +
+           `**Próximos pasos para ti:**\n` +
+           `• 📅 Seleccionar fecha y hora preferida\n` +
+           `• 💳 Confirmar reserva (sin compromiso)\n` +
+           `• 📱 Recibir confirmación inmediata\n\n` +
+           `**¿Empezamos con la reserva?** Te guío paso a paso para que sea súper fácil! 🚀`;
+  }
+  
+  /**
+   * Genera respuesta para etapa de acción
+   */
+  private async generateActionResponse(intent: any, userId: string): Promise<string> {
+    // Generar propuestas de venta
+    const proposals = await this.generateSalesProposals(intent, userId);
+    
+    let response = `¡Fantástico! 🎯 Vamos a cerrar tu reserva paso a paso.\n\n`;
+    
+    if (proposals && proposals.length > 0) {
+      response += `**Opciones disponibles para ti:**\n\n`;
+      
+      proposals.forEach((proposal, index) => {
+        response += `**${index + 1}. ${proposal.serviceName}**\n`;
+        response += `   💰 Precio: ${proposal.price}€\n`;
+        response += `   ⏱️ Duración: ${proposal.duration} min\n`;
+        response += `   ${proposal.specialOffer ? `🎁 ${proposal.specialOffer}\n` : ''}`;
+        response += `   📋 ${proposal.nextStep}\n\n`;
+      });
+      
+      response += `**¿Cuál opción prefieres?** Responde con el número o el nombre del servicio. 🎯`;
+    } else {
+      response += `**Vamos a agendar tu cita ahora mismo!** 📅\n\n` +
+                  `¿Qué día te viene mejor? Tenemos disponibilidad esta semana y la próxima.`;
+    }
+    
+    return response;
+  }
+  
+  /**
+   * Genera respuesta para etapa de cierre
+   */
+  private async generateClosingResponse(intent: any, userId: string): Promise<string> {
+    return `¡Excelente decisión! 🎉 Estás a un paso de transformar tu vida.\n\n` +
+           `**Resumen de tu reserva:**\n` +
+           `• ✅ Servicio seleccionado\n` +
+           `• ✅ Fecha y hora confirmadas\n` +
+           `• ✅ Precio acordado\n\n` +
+           `**Último paso:** Confirmar tu reserva\n\n` +
+           `**¿Confirmas que quieres proceder con la reserva?** Una vez confirmado, recibirás:\n` +
+           `• 📧 Email de confirmación\n` +
+           `• 📱 SMS de recordatorio\n` +
+           `• 🗓️ Evento en tu calendario\n\n` +
+           `**Responde "SÍ" para confirmar** o "NO" si quieres hacer algún cambio. 🎯`;
+  }
+  
+  /**
+   * Genera propuestas de venta personalizadas
+   */
+  private async generateSalesProposals(intent: any, userId: string): Promise<SalesProposal[]> {
+    try {
+      // Obtener servicios disponibles
+      const services = dbManager.query<{
+        id: number;
+        name: string;
+        duration_min: number;
+        price_cents: number;
+        active: number;
+      }>('SELECT * FROM services WHERE active = 1 ORDER BY price_cents ASC');
+      
+      const proposals: SalesProposal[] = [];
+      
+      services.forEach(service => {
+        const price = service.price_cents / 100;
+        const urgency = intent.urgency || 5;
+        
+        // Crear propuesta personalizada
+        const proposal: SalesProposal = {
+          serviceId: service.id,
+          serviceName: service.name,
+          price,
+          duration: service.duration_min,
+          benefits: this.generateBenefits(service.name, intent),
+          urgency: this.generateUrgency(urgency),
+          nextStep: this.generateNextStep(service.name)
+        };
+        
+        // Agregar ofertas especiales
+        if (urgency >= 8) {
+          proposal.specialOffer = `15% descuento por urgencia - Solo ${(price * 0.85).toFixed(2)}€`;
+        } else if (price >= 80) {
+          proposal.specialOffer = `10% descuento en primera sesión - Solo ${(price * 0.9).toFixed(2)}€`;
+        }
+        
+        proposals.push(proposal);
+      });
+      
+      return proposals;
+      
+    } catch (error) {
+      console.error('Error generando propuestas de venta:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Genera beneficios personalizados para cada servicio
+   */
+  private generateBenefits(serviceName: string, intent: any): string[] {
+    const benefits: { [key: string]: string[] } = {
+              'Consulta Farmacéutica': [
+        'Evaluación completa en 30 minutos',
+        'Plan de acción inmediato',
+        'Recomendaciones personalizadas',
+        'Seguimiento por email'
+      ],
+      'Sesión Terapéutica': [
+        'Trabajo en profundidad',
+        'Técnicas especializadas',
+        'Seguimiento continuo',
+        'Resultados medibles'
+      ],
+      'Evaluación Inicial': [
+        'Análisis completo y detallado',
+        'Diagnóstico profesional',
+        'Plan de tratamiento largo plazo',
+        'Sesiones de seguimiento incluidas'
+      ]
+    };
+    
+            return benefits[serviceName] || benefits['Consulta Farmacéutica'];
+  }
+  
+  /**
+   * Genera urgencia personalizada
+   */
+  private generateUrgency(urgency: number): string {
+    if (urgency >= 9) return '🚨 URGENTE - Actuar inmediatamente';
+    if (urgency >= 7) return '⚡ ALTA - Recomendado esta semana';
+    if (urgency >= 5) return '📅 MEDIA - Próximas 2 semanas';
+    return '📋 BAJA - Cuando sea conveniente';
+  }
+  
+  /**
+   * Genera siguiente paso personalizado
+   */
+  private generateNextStep(serviceName: string): string {
+    return `Reservar ${serviceName} - Proceso rápido y seguro`;
+  }
+  
+  /**
+   * Obtiene la siguiente acción recomendada
+   */
+  private getNextAction(stage: string): string {
+    const actions: { [key: string]: string } = {
+      'awareness': 'Proporcionar información detallada',
+      'interest': 'Generar interés y beneficios',
+      'desire': 'Crear urgencia y ofertas',
+      'action': 'Facilitar reserva',
+      'closing': 'Confirmar y cerrar venta'
+    };
+    
+    return actions[stage] || 'Generar interés';
+  }
+  
+  /**
+   * Cierra una venta exitosa
+   */
+  async closeSale(serviceId: number, userId: string, customerData: any): Promise<{
+    success: boolean;
+    appointmentId?: number;
+    message: string;
+  }> {
+    try {
+      // Crear cliente si no existe
+      let customerId = customerData.id;
+      if (!customerId) {
+        const result = dbManager.run(`
+          INSERT INTO customers (name, email, phone)
+          VALUES (?, ?, ?)
+        `, [
+          customerData.name,
+          customerData.email,
+          customerData.phone
+        ]);
+        
+        customerId = result.lastInsertRowid;
+      }
+      
+      // Crear cita
+      const appointment = await appointmentsService.bookAppointment({
+        name: customerData.name,
+        email: customerData.email,
+        phone: customerData.phone,
+        serviceId,
+        datetimeISO: customerData.preferredDate
+      });
+
+      return {
+        success: true,
+        appointmentId: appointment.id,
+        message: `¡Venta cerrada exitosamente! 🎉\n\n` +
+                 `**Resumen de tu reserva:**\n` +
+                 `• 📅 Fecha: ${customerData.preferredDate}\n` +
+                 `• 🎯 Servicio: ${appointment.service_name}\n` +
+                 `• 💰 Precio: ${(appointment.service_price / 100).toFixed(2)}€\n\n` +
+                 `Recibirás confirmación por email y SMS. ¡Nos vemos pronto! 🌟`
+      };
+      
+    } catch (error) {
+      console.error('Error cerrando venta:', error);
+      return {
+        success: false,
+        message: 'Hubo un error al procesar tu reserva. Por favor, contacta con nuestro equipo.'
       };
     }
   }
 }
 
-// Exportar instancia singleton
 export const salesService = new SalesService();
 export default salesService;
